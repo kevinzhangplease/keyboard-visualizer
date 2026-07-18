@@ -7,8 +7,11 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { Style } from '../style/types';
 
-const CAMERA_BASE_POSITION = new THREE.Vector3(0, 5.2, 12.5);
-const CAMERA_LOOK_AT = new THREE.Vector3(0, 0.4, 0);
+// Top-down "interface" framing: far overhead + a narrow (telephoto-like) FOV nearly
+// eliminates near/far perspective falloff, so every row of keys reads at a uniform size.
+const CAMERA_BASE_POSITION = new THREE.Vector3(0, 28, 2);
+const CAMERA_LOOK_AT = new THREE.Vector3(0, 0, 0);
+const CAMERA_FOV = 24;
 
 export interface Stage {
   renderer: THREE.WebGLRenderer;
@@ -37,12 +40,23 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
   renderer.setClearColor(0x0b0d13, 1);
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
+  const camera = new THREE.PerspectiveCamera(
+    CAMERA_FOV,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    100,
+  );
+  // Looking almost straight down puts the view direction close to parallel with the default
+  // (0,1,0) up vector — lookAt() then has to guess a "right" axis, which reads on screen as an
+  // arbitrary roll/skew. Pinning up to world -Z fixes the orientation: the number row (further
+  // in -Z) reads at screen-top and the space bar (furthest in +Z) at screen-bottom, like a
+  // keyboard reference diagram.
+  camera.up.set(0, 0, -1);
   camera.position.copy(CAMERA_BASE_POSITION);
   camera.lookAt(CAMERA_LOOK_AT);
 
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 1.1);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.85);
   directionalLight.position.set(5, 8, 6);
   const pointLight = new THREE.PointLight(0xffffff, 0.6, 20);
   pointLight.position.set(0, -1.5, 2);

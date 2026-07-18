@@ -4,7 +4,7 @@ A seed-driven generative instrument — every keystroke is light and sound.
 
 **Deployed URL:** _not yet deployed — see [Deployment](#deployment) below._
 
-![Hero screenshot — Space theme](docs/hero.png)
+![Hero screenshot — Desert theme](docs/hero.png)
 
 ## How it works
 

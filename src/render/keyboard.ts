@@ -13,6 +13,14 @@ const ATLAS_SIZE = 2048;
 const ATLAS_COLS = 10;
 const ATLAS_ROWS = Math.ceil(KEY_LAYOUT.length / ATLAS_COLS);
 
+// Keycaps read as vivid, saturated color panels rather than muted neutral plastic: use the
+// theme's accent hue/lightness (S3) as the keycap identity, with its chroma pushed past the
+// anchor's own value — the OKLCH gamut-reduction in oklchToLinearSrgb keeps it safe, settling
+// each theme at its own maximum vivid color for that hue/lightness. A flat multiplier (rather
+// than also scaling by keyChromaMul) avoids compounding into blowout on themes that are already
+// bright from high metalness/emissive/bloom (Space).
+const KEY_VIBRANCY_CHROMA_MUL = 1.9;
+
 export interface KeyMesh {
   def: KeyDef;
   group: THREE.Group;
@@ -33,8 +41,9 @@ export interface Keyboard {
   applyMaterials: (style: Style) => void;
 }
 
-function chromaScale(c: Oklch, mul: number): Oklch {
-  return { l: c.l, c: c.c * mul, h: c.h };
+function vibrantKeyColor(style: Style): Oklch {
+  const accent = style.palette[3];
+  return { l: accent.l, c: accent.c * KEY_VIBRANCY_CHROMA_MUL, h: accent.h };
 }
 
 function buildLabelAtlas(): { texture: THREE.CanvasTexture; uv: Map<string, [number, number, number, number]> } {
@@ -43,8 +52,6 @@ function buildLabelAtlas(): { texture: THREE.CanvasTexture; uv: Map<string, [num
   canvas.height = ATLAS_SIZE;
   const ctx = canvas.getContext('2d')!;
   ctx.clearRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
-  ctx.font = '600 14px system-ui';
-  ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
@@ -58,6 +65,16 @@ function buildLabelAtlas(): { texture: THREE.CanvasTexture; uv: Map<string, [num
     const cellX = col * cellW;
     const cellY = row * cellH;
     if (def.label) {
+      // Big and bold with a dark outline: readable from directly overhead against any
+      // theme's vivid keycap color. Multi-character labels (Backspace, Shift, ...) shrink
+      // to fit the cell.
+      const fontSize = def.label.length > 2 ? 30 : 46;
+      ctx.font = `700 ${fontSize}px system-ui`;
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = fontSize * 0.16;
+      ctx.strokeStyle = 'rgba(10, 12, 18, 0.6)';
+      ctx.strokeText(def.label, cellX + cellW / 2, cellY + cellH / 2);
+      ctx.fillStyle = '#ffffff';
       ctx.fillText(def.label, cellX + cellW / 2, cellY + cellH / 2);
     }
     const u0 = cellX / ATLAS_SIZE;
@@ -98,7 +115,9 @@ function buildKeyGeometry(def: KeyDef, style: Style): THREE.BufferGeometry {
 
 export function createKeyboard(stage: Stage, style: Style): Keyboard {
   const group = new THREE.Group();
-  group.rotation.x = THREE.MathUtils.degToRad(-18);
+  // A slight residual tilt keeps the "interface" framing from feeling perfectly flat/orthographic
+  // while staying close enough to top-down that every label reads clearly (top-down view request).
+  group.rotation.x = THREE.MathUtils.degToRad(-6);
   group.position.y = 0;
 
   const { texture: atlasTexture, uv } = buildLabelAtlas();
@@ -106,7 +125,7 @@ export function createKeyboard(stage: Stage, style: Style): Keyboard {
   const keys: KeyMesh[] = [];
   const keyByCode = new Map<string, KeyMesh>();
 
-  const baseColor = toThreeColor(chromaScale(style.palette[2], style.keyChromaMul));
+  const baseColor = toThreeColor(vibrantKeyColor(style));
   const emissiveColor = toThreeColor(style.palette[4]);
   const labelColor = toThreeColor(style.palette[5]);
 
@@ -158,7 +177,7 @@ export function createKeyboard(stage: Stage, style: Style): Keyboard {
       map: atlasTexture,
       color: labelColor,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.92,
       depthWrite: false,
     });
     const uvRect = uv.get(def.code)!;
@@ -200,7 +219,7 @@ export function createKeyboard(stage: Stage, style: Style): Keyboard {
   }
 
   function applyMaterials(newStyle: Style): void {
-    const base = toThreeColor(chromaScale(newStyle.palette[2], newStyle.keyChromaMul));
+    const base = toThreeColor(vibrantKeyColor(newStyle));
     const emissive = toThreeColor(newStyle.palette[4]);
     const label = toThreeColor(newStyle.palette[5]);
     for (const km of keys) {
@@ -234,6 +253,6 @@ export function setupEnvironment(stage: Stage): void {
   const pmrem = new THREE.PMREMGenerator(stage.renderer);
   const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   stage.scene.environment = envTexture;
-  stage.scene.environmentIntensity = 0.5;
+  stage.scene.environmentIntensity = 0.15;
   pmrem.dispose();
 }
