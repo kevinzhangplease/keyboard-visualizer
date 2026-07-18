@@ -224,6 +224,12 @@ export function updateLights(stage: Stage, style: Style): void {
   stage.pointLight.color.copy(toThreeColor(style.palette[3]));
 }
 
+export function getKeyTopWorld(keyboard: Keyboard, def: KeyDef, style: Style): THREE.Vector3 {
+  const local = new THREE.Vector3(def.x, style.keyDepth / 2, def.z);
+  keyboard.group.updateMatrixWorld(true);
+  return local.applyMatrix4(keyboard.group.matrixWorld);
+}
+
 export function setupEnvironment(stage: Stage): void {
   const pmrem = new THREE.PMREMGenerator(stage.renderer);
   const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
