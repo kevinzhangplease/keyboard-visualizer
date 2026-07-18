@@ -179,6 +179,27 @@ export function triggerBackspace(def: KeyDef, style: Style, clock: number, hooks
   hooks.playBackspaceSound?.(def, style);
 }
 
+// Idle "the machine is dreaming" flourish: a 40%-strength flash+pulse, no sound, no particles
+// (spec §8.2).
+export function triggerGhostRipple(def: KeyDef, style: Style, clock: number): void {
+  const dur = (ms: number) => ms / 1000 / style.animSpeed;
+  const state = stateFor(def.code);
+  const strength = 0.4;
+
+  state.flashStart = clock;
+  state.flashPeak = 1.6 * style.wFlash * strength;
+
+  const amp = 0.04 * style.wPulse * strength;
+  schedule({
+    start: clock,
+    dur: dur(260),
+    ease: easeHalfSine,
+    apply: (eased) => {
+      state.pulseY = amp * eased;
+    },
+  });
+}
+
 export function updateKeyAnims(keyboard: Keyboard, style: Style, clock: number): void {
   for (let i = anims.length - 1; i >= 0; i--) {
     const a = anims[i]!;
