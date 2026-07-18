@@ -14,6 +14,7 @@ import { createParticleSystem } from './render/particles';
 import { createQualityGovernor } from './state/quality';
 import { createVelocityTracker } from './input/velocity';
 import { createMorphController } from './state/transitions';
+import { createReducedMotionWatcher, applyReducedMotion } from './state/reducedMotion';
 import { createIdleController } from './ui/idle';
 import { createHud } from './ui/hud';
 import { initKeyInput, onFunctionKey, onKeyEvent } from './input/keys';
@@ -27,7 +28,8 @@ stage.scene.add(background.mesh);
 
 const seed = getSeedFromURL();
 const morph = createMorphController(seed);
-let currentStyle = morph.style;
+const reducedMotion = createReducedMotionWatcher();
+let currentStyle = applyReducedMotion(morph.style, reducedMotion.active);
 background.setStyle(currentStyle);
 
 const keyboard: Keyboard = createKeyboard(stage, currentStyle);
@@ -109,7 +111,8 @@ window.addEventListener('resize', () => {
 
 let booted = false;
 let lastFrameMs = performance.now();
-let lastAppliedStyle: typeof currentStyle | null = null;
+let lastMorphStyleRef: typeof currentStyle | null = null;
+let lastReducedActive = reducedMotion.active;
 
 function fadeSplash(): void {
   const splash = document.getElementById('splash');
@@ -129,11 +132,13 @@ function loop(): void {
 
   // 1. morph interpolation -> currentStyle
   const morphCompleted = morph.update(clock);
-  currentStyle = morph.style;
   // lerpStyle() only allocates a new object while a morph is actively running, so a
   // reference check is a free "did anything change" test — skips redundant OKLCH work at idle.
-  if (currentStyle !== lastAppliedStyle) {
-    lastAppliedStyle = currentStyle;
+  // The reduced-motion toggle is the other thing that can change currentStyle out-of-band.
+  if (morph.style !== lastMorphStyleRef || reducedMotion.active !== lastReducedActive) {
+    lastMorphStyleRef = morph.style;
+    lastReducedActive = reducedMotion.active;
+    currentStyle = applyReducedMotion(morph.style, reducedMotion.active);
     keyboard.applyMaterials(currentStyle);
     updateLights(stage, currentStyle);
     background.setStyle(currentStyle);
@@ -151,15 +156,16 @@ function loop(): void {
   quality.update(dtMs);
 
   // 4. camera drift
+  const lowRes = quality.tier >= 2;
   updateCameraDrift(stage, currentStyle, clock, idle.driftScale);
-  updateBloom(stage, currentStyle, velocity.v);
+  updateBloom(stage, currentStyle, velocity.v, lowRes);
 
   // 5. key animations (idle breathing/ghost-ripple runs after so it wins at rest)
   updateKeyAnims(keyboard, currentStyle, clock);
-  idle.update(clock, currentStyle, keyboard, particles);
+  idle.update(clock, currentStyle, keyboard, particles, reducedMotion.active);
 
   // 6. particle uniforms
-  particles.update(clock, currentStyle, velocity.v, stage);
+  particles.update(clock, currentStyle, velocity.v, stage, lowRes);
 
   // 7. background uniforms
   const pressWaveAge = clock - lastBackspaceTime;

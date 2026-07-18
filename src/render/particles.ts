@@ -25,7 +25,13 @@ export interface ParticleSystem {
   ) => void;
   spawnBackspaceRing: (origin: THREE.Vector3, style: Style) => void;
   spawnTrickle: (origin: THREE.Vector3, style: Style) => void;
-  update: (clock: number, style: Style, velocity: number, stage: Stage) => void;
+  update: (
+    clock: number,
+    style: Style,
+    velocity: number,
+    stage: Stage,
+    disableTrail: boolean,
+  ) => void;
   setSeed: (seed: number) => void;
 }
 
@@ -231,12 +237,18 @@ export function createParticleSystem(stage: Stage, seed: number): ParticleSystem
     flagUpdate();
   }
 
-  function update(clock: number, style: Style, velocity: number, stage: Stage): void {
+  function update(
+    clock: number,
+    style: Style,
+    velocity: number,
+    stage: Stage,
+    disableTrail: boolean,
+  ): void {
     uniforms.uTime.value = clock;
     uniforms.uDrag.value = style.pDrag;
     uniforms.uGravity.value = style.pGravity;
     uniforms.uTurbulence.value = style.pTurbulence;
-    uniforms.uTrail.value = style.pTrail;
+    uniforms.uTrail.value = disableTrail ? 0 : style.pTrail;
     uniforms.uVelocity.value = velocity;
     uniforms.uShape.value = style.pShape;
 

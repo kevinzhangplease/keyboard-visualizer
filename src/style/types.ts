@@ -1,3 +1,5 @@
+// Shared style-domain types: OKLCH color, the 6-stop palette, and the Style record itself.
+
 import type { DialName } from './dials';
 
 export interface Oklch {

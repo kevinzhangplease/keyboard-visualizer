@@ -105,7 +105,10 @@ export function updateCameraDrift(stage: Stage, style: Style, clock: number, dri
 }
 
 // Bloom strength gets a live velocity lift (spec §7.3: "bloom strength·(1+0.25v)").
-export function updateBloom(stage: Stage, style: Style, velocity: number): void {
+// `lowRes` (quality tier >= 2, spec §7.2) halves the bloom render target resolution again.
+export function updateBloom(stage: Stage, style: Style, velocity: number, lowRes: boolean): void {
   stage.bloomPass.strength = style.bloomStrength * (1 + 0.25 * velocity);
   stage.bloomPass.threshold = style.bloomThreshold;
+  const scale = lowRes ? 0.25 : 0.5;
+  stage.bloomPass.resolution.set(window.innerWidth * scale, window.innerHeight * scale);
 }

@@ -19,7 +19,13 @@ export interface IdleController {
   driftScale: number;
   isIdle: boolean;
   notifyActivity: (clock: number) => void;
-  update: (clock: number, style: Style, keyboard: Keyboard, particles: ParticleSystem) => void;
+  update: (
+    clock: number,
+    style: Style,
+    keyboard: Keyboard,
+    particles: ParticleSystem,
+    reducedMotion: boolean,
+  ) => void;
 }
 
 export function createIdleController(seed: number): IdleController {
@@ -47,11 +53,14 @@ export function createIdleController(seed: number): IdleController {
       lastActivity = clock;
       removeHintPermanently();
     },
-    update(clock, style, keyboard, particles) {
+    update(clock, style, keyboard, particles, reducedMotion) {
       const dt = Math.max(0, clock - lastFrameClock);
       lastFrameClock = clock;
 
-      if (hint) hint.style.color = toCssOklch(style.palette[5], 0.45);
+      if (hint) {
+        hint.style.color = toCssOklch(style.palette[5], 0.45);
+        hint.classList.toggle('reduced-motion', reducedMotion);
+      }
 
       const idle = clock - lastActivity > IDLE_THRESHOLD;
       controller.isIdle = idle;
@@ -76,7 +85,8 @@ export function createIdleController(seed: number): IdleController {
         particles.spawnTrickle(getKeyTopWorld(keyboard, def, style), style);
       }
 
-      // Ghost ripple every 7-11s.
+      // Ghost ripple every 7-11s (off under reduced motion, spec §9.6).
+      if (reducedMotion) return;
       if (lastGhostAt === null) lastGhostAt = clock;
       if (clock - lastGhostAt > nextGhostAt) {
         const def = KEY_LAYOUT[Math.floor(rng() * KEY_LAYOUT.length)]!;
