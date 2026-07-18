@@ -1,0 +1,157 @@
+/* Splash, canvas, hint and HUD chrome. All colors besides the splash are set live from the current Style via JS. */
+
+html,
+body {
+  background: #0b0d13;
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: system-ui, sans-serif;
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  outline: none;
+}
+
+#splash {
+  position: fixed;
+  inset: 0;
+  background: #0b0d13;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+#splash-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8ea0c0;
+  animation: splash-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes splash-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 0.8;
+  }
+}
+
+#hint {
+  position: fixed;
+  bottom: 12vh;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+  animation: hint-pulse 3s ease-in-out infinite;
+  transition: opacity 0.6s ease;
+}
+
+#hint.reduced-motion {
+  animation: none;
+  opacity: 0.45;
+}
+
+#hint.hidden {
+  opacity: 0;
+}
+
+@keyframes hint-pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+#hud {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0.55;
+  transition:
+    opacity 0.5s ease,
+    opacity 0.12s ease;
+  pointer-events: auto;
+  user-select: none;
+}
+
+#hud.hovered {
+  opacity: 1;
+}
+
+#hud.faded {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hud-dots {
+  display: flex;
+  gap: 8px;
+}
+
+.hud-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.hud-dot.active {
+  box-shadow: 0 0 0 1.5px var(--hud-ring, #fff);
+  box-shadow: 0 0 0 1.5px var(--hud-ring, #fff);
+  outline: 1.5px solid var(--hud-ring, #fff);
+  outline-offset: 2px;
+}
+
+.hud-sep {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 11px;
+}
+
+.hud-dice {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  display: inline-flex;
+  transition: transform 0.2s ease;
+}
+
+.hud-dice.spin {
+  transform: rotate(90deg);
+}
+
+.hud-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  white-space: nowrap;
+}
