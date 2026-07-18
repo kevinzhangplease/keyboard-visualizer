@@ -7,9 +7,9 @@ varying float vTauFrac;
 varying float vTau;
 varying vec2 vUv;
 varying float vSeed;
+varying vec3 vColorA;
+varying vec3 vColorB;
 
-uniform vec3 uColA;
-uniform vec3 uColB;
 uniform float uShape;
 
 void main() {
@@ -31,7 +31,7 @@ void main() {
   float wShard = smoothstep(0.5, 1.0, uShape);
   float mask = disc * wDisc + ring * wRing + shard * wShard;
 
-  vec3 col = mix(uColA, uColB, vTauFrac);
+  vec3 col = mix(vColorA, vColorB, vTauFrac);
   float alpha = pow(1.0 - vTauFrac, 2.0) * 0.9 * mask;
 
   if (alpha <= 0.001) discard;

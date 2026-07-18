@@ -89,7 +89,10 @@ void main() {
     vec2 c2 = wUv * 6.5 + vec2(-uTime * uFlowSpeed * 0.8, uTime * uFlowSpeed * 0.8);
     float f1a = voronoiF1F2(c1, 1.0).x;
     float f1b = voronoiF1F2(c2, 1.0).x;
-    float caustic = pow(1.0 - clamp(f1a, 0.0, 1.0), 6.0) + pow(1.0 - clamp(f1b, 0.0, 1.0), 6.0);
+    float rawCaustic = pow(1.0 - clamp(f1a, 0.0, 1.0), 6.0) + pow(1.0 - clamp(f1b, 0.0, 1.0), 6.0);
+    // Sharpen: push the broad pow(1-F1,6) glow through a hard threshold so only the
+    // near-point cores read as bright webs instead of a wide, washed-out blob field.
+    float caustic = smoothstep(0.25, 0.85, rawCaustic);
     col += uPalette[3] * clamp(caustic * uCaustics, 0.0, 0.35);
   }
 
@@ -127,6 +130,16 @@ void main() {
     float h0 = heights[0];
     float glowBand = smoothstep(h0 + 0.12, h0, wUv.y) * (1.0 - smoothstep(h0, h0 - 0.004, wUv.y));
     col = mix(col, uPalette[3], glowBand * uTerrain * 0.5);
+
+    // Sun-glow disc (spec §3.5, Desert): no dedicated dial, so its presence is derived —
+    // strong for smooth low-ridge terrain (Desert), negligible for jagged ridged terrain.
+    float sunWeight = uTerrain * (1.0 - uRidged);
+    if (sunWeight > 0.01) {
+      float sunDist = distance(wUv, vec2(0.72, 0.68));
+      float sun = pow(smoothstep(0.5, 0.0, sunDist), 3.0);
+      col += uPalette[4] * sun * 0.5 * sunWeight;
+    }
+
     col = mix(col, terrainCol, terrainMask * uTerrain);
   }
 

@@ -50,6 +50,8 @@ function buildGeometry(): THREE.InstancedBufferGeometry {
   const seed = new Float32Array(MAX_PARTICLES);
   const kind = new Float32Array(MAX_PARTICLES);
   const size = new Float32Array(MAX_PARTICLES);
+  const colorA = new Float32Array(MAX_PARTICLES * 3);
+  const colorB = new Float32Array(MAX_PARTICLES * 3);
 
   geometry.setAttribute('aSpawn', new THREE.InstancedBufferAttribute(spawn, 1));
   geometry.setAttribute('aLife', new THREE.InstancedBufferAttribute(life, 1));
@@ -58,6 +60,8 @@ function buildGeometry(): THREE.InstancedBufferGeometry {
   geometry.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seed, 1));
   geometry.setAttribute('aKind', new THREE.InstancedBufferAttribute(kind, 1));
   geometry.setAttribute('aSize', new THREE.InstancedBufferAttribute(size, 1));
+  geometry.setAttribute('aColorA', new THREE.InstancedBufferAttribute(colorA, 3));
+  geometry.setAttribute('aColorB', new THREE.InstancedBufferAttribute(colorB, 3));
 
   return geometry;
 }
@@ -75,8 +79,6 @@ export function createParticleSystem(stage: Stage, seed: number): ParticleSystem
     uCamRight: { value: new THREE.Vector3(1, 0, 0) },
     uCamUp: { value: new THREE.Vector3(0, 1, 0) },
     uConvergeTarget: { value: new THREE.Vector3(0, 0, 0) },
-    uColA: { value: new THREE.Vector3(1, 1, 1) },
-    uColB: { value: new THREE.Vector3(1, 1, 1) },
     uShape: { value: 0 },
   };
 
@@ -101,6 +103,8 @@ export function createParticleSystem(stage: Stage, seed: number): ParticleSystem
   const aSeed = geometry.getAttribute('aSeed') as THREE.InstancedBufferAttribute;
   const aKind = geometry.getAttribute('aKind') as THREE.InstancedBufferAttribute;
   const aSize = geometry.getAttribute('aSize') as THREE.InstancedBufferAttribute;
+  const aColorA = geometry.getAttribute('aColorA') as THREE.InstancedBufferAttribute;
+  const aColorB = geometry.getAttribute('aColorB') as THREE.InstancedBufferAttribute;
 
   let cursor = 0;
   let rng = rngFromSeed(seed);
@@ -112,6 +116,17 @@ export function createParticleSystem(stage: Stage, seed: number): ParticleSystem
     rng = rngFromSeed(newSeed);
   }
 
+  // Colors are captured once per spawn from the CURRENT style and baked into the instance —
+  // live particles must keep their spawn-time colors and die naturally (spec §8.1).
+  function spawnColors(style: Style): { a: THREE.Vector3; b: THREE.Vector3 } {
+    const useShimmerOverride = style.bgShimmer > 0.6;
+    const colA = useShimmerOverride ? style.palette[2] : style.palette[4];
+    const colB = useShimmerOverride ? style.palette[3] : style.palette[5];
+    const a = oklchToLinearSrgb(colA);
+    const b = oklchToLinearSrgb(colB);
+    return { a: new THREE.Vector3(a.r, a.g, a.b), b: new THREE.Vector3(b.r, b.g, b.b) };
+  }
+
   function writeParticle(
     now: number,
     life_: number,
@@ -119,6 +134,8 @@ export function createParticleSystem(stage: Stage, seed: number): ParticleSystem
     velocity: THREE.Vector3,
     size_: number,
     kind_: number,
+    colA: THREE.Vector3,
+    colB: THREE.Vector3,
   ): void {
     const i = cursor;
     cursor = (cursor + 1) % MAX_PARTICLES;
@@ -130,6 +147,8 @@ export function createParticleSystem(stage: Stage, seed: number): ParticleSystem
     aSeed.setX(i, rng());
     aKind.setX(i, kind_);
     aSize.setX(i, size_);
+    aColorA.setXYZ(i, colA.x, colA.y, colA.z);
+    aColorB.setXYZ(i, colB.x, colB.y, colB.z);
   }
 
   function flagUpdate(): void {
@@ -140,6 +159,8 @@ export function createParticleSystem(stage: Stage, seed: number): ParticleSystem
     aSeed.needsUpdate = true;
     aKind.needsUpdate = true;
     aSize.needsUpdate = true;
+    aColorA.needsUpdate = true;
+    aColorB.needsUpdate = true;
   }
 
   function spawnBurst(
@@ -159,6 +180,7 @@ export function createParticleSystem(stage: Stage, seed: number): ParticleSystem
     const n = Math.min(Math.round(rawCount), MAX_SPAWN_PER_PRESS);
     const now = uniforms.uTime.value;
     const coneHalfAngle = THREE.MathUtils.degToRad(lerp(20, 90, style.pSpread));
+    const { a: colA, b: colB } = spawnColors(style);
     for (let k = 0; k < n; k++) {
       // Hemisphere-around-+Y direction within the spread cone.
       const theta = rng() * Math.PI * 2;
@@ -172,7 +194,7 @@ export function createParticleSystem(stage: Stage, seed: number): ParticleSystem
       const life = style.pLifespan * (0.7 + 0.6 * rng());
       const size =
         style.pSize * (0.7 + 0.6 * rng()) * (large ? 1.4 : 1) * (opts.sizeMul ?? 1);
-      writeParticle(now, life, origin, dir.multiplyScalar(speed), size, 0);
+      writeParticle(now, life, origin, dir.multiplyScalar(speed), size, 0, colA, colB);
     }
     flagUpdate();
   }
@@ -181,6 +203,7 @@ export function createParticleSystem(stage: Stage, seed: number): ParticleSystem
     const count = Math.min(Math.round(0.8 * style.pCountBase), MAX_SPAWN_PER_PRESS);
     const now = uniforms.uTime.value;
     const radius = 1.2;
+    const { a: colA, b: colB } = spawnColors(style);
     uniforms.uConvergeTarget.value.copy(origin);
     for (let k = 0; k < count; k++) {
       const angle = (k / count) * Math.PI * 2;
@@ -192,7 +215,7 @@ export function createParticleSystem(stage: Stage, seed: number): ParticleSystem
       const inward = new THREE.Vector3(origin.x - ringPos.x, 0, origin.z - ringPos.z)
         .normalize()
         .multiplyScalar(style.pSpeed * 0.8);
-      writeParticle(now, 0.42, ringPos, inward, style.pSize * 0.8, 1);
+      writeParticle(now, 0.42, ringPos, inward, style.pSize * 0.8, 1, colA, colB);
     }
     flagUpdate();
   }
@@ -203,18 +226,9 @@ export function createParticleSystem(stage: Stage, seed: number): ParticleSystem
     const speed = style.pSpeed * 0.4;
     const life = style.pLifespan * 1.5;
     const size = style.pSize * (0.7 + 0.6 * rng());
-    writeParticle(now, life, origin, dir.multiplyScalar(speed), size, 0);
+    const { a: colA, b: colB } = spawnColors(style);
+    writeParticle(now, life, origin, dir.multiplyScalar(speed), size, 0, colA, colB);
     flagUpdate();
-  }
-
-  function updateColorUniforms(style: Style): void {
-    const useShimmerOverride = style.bgShimmer > 0.6;
-    const colA = useShimmerOverride ? style.palette[2] : style.palette[4];
-    const colB = useShimmerOverride ? style.palette[3] : style.palette[5];
-    const a = oklchToLinearSrgb(colA);
-    const b = oklchToLinearSrgb(colB);
-    uniforms.uColA.value.set(a.r, a.g, a.b);
-    uniforms.uColB.value.set(b.r, b.g, b.b);
   }
 
   function update(clock: number, style: Style, velocity: number, stage: Stage): void {
@@ -225,7 +239,6 @@ export function createParticleSystem(stage: Stage, seed: number): ParticleSystem
     uniforms.uTrail.value = style.pTrail;
     uniforms.uVelocity.value = velocity;
     uniforms.uShape.value = style.pShape;
-    updateColorUniforms(style);
 
     stage.camera.matrixWorld.extractBasis(camRight, camUp, camForward);
     uniforms.uCamRight.value.copy(camRight);

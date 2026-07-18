@@ -11,6 +11,8 @@ attribute vec3 aVel;
 attribute float aSeed;
 attribute float aKind; // 0 normal, 1 backspace-converge
 attribute float aSize;
+attribute vec3 aColorA;
+attribute vec3 aColorB;
 
 uniform float uTime;
 uniform float uDrag;
@@ -26,6 +28,8 @@ varying float vTauFrac;
 varying float vTau;
 varying vec2 vUv;
 varying float vSeed;
+varying vec3 vColorA;
+varying vec3 vColorB;
 
 float hash13(vec3 p3) {
   p3 = fract(p3 * 0.1031);
@@ -70,6 +74,8 @@ void main() {
   vTau = tau;
   vUv = uv;
   vSeed = aSeed;
+  vColorA = aColorA;
+  vColorB = aColorB;
 
   bool alive = tau >= 0.0 && tau <= aLife;
 
