@@ -30,6 +30,11 @@ export function easeHalfSine(t: number): number {
   return Math.sin(clamp(t, 0, 1) * Math.PI);
 }
 
+// 0 -> 1 -> 0 triangle wave over t in [0,1]. Same shape as the GLSL ridge() fold.
+export function triangle(t: number): number {
+  return 1 - Math.abs(2 * clamp(t, 0, 1) - 1);
+}
+
 // Analytic exponential decay toward 0 with time constant tau, evaluated at elapsed time t.
 export function expDecay(t: number, tau: number): number {
   return Math.exp(-t / tau);
