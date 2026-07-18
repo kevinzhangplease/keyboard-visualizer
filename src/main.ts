@@ -1,6 +1,6 @@
 // Bootstrap: seed from URL -> Style -> init modules -> render loop.
 
-import { createStage } from './render/stage';
+import { createStage, updateBloom, updateCameraDrift } from './render/stage';
 import { createBackground } from './render/background';
 import {
   createKeyboard,
@@ -14,9 +14,11 @@ import { createParticleSystem } from './render/particles';
 import { createQualityGovernor } from './state/quality';
 import { createVelocityTracker } from './input/velocity';
 import { createMorphController } from './state/transitions';
+import { createIdleController } from './ui/idle';
+import { createHud } from './ui/hud';
 import { initKeyInput, onFunctionKey, onKeyEvent } from './input/keys';
 import { initAudioEngine, noteOn, noteOnBackspace, setAudioStyle } from './audio/engine';
-import { getSeedFromURL, NAMED_SEED_LIST } from './core/seed';
+import { getSeedFromURL, NAMED_SEED_LIST, randomSeed } from './core/seed';
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 const stage = createStage(canvas);
@@ -38,6 +40,7 @@ setAudioStyle(currentStyle);
 
 const quality = createQualityGovernor();
 const velocity = createVelocityTracker();
+const idle = createIdleController(seed);
 const startTime = performance.now() / 1000;
 let lastBackspaceTime = -Infinity;
 
@@ -59,6 +62,7 @@ onKeyEvent(({ key, isDown }) => {
   if (!isDown) return; // keyup has no extra visual — return is time-based
   const clock = performance.now() / 1000 - startTime;
   velocity.recordPress(clock);
+  idle.notifyActivity(clock);
   if (key.backspace) {
     lastBackspaceTime = clock;
     triggerBackspace(key, currentStyle, clock, hooks);
@@ -67,12 +71,36 @@ onKeyEvent(({ key, isDown }) => {
   }
 });
 
+const hudEl = document.getElementById('hud') as HTMLElement;
+const hud = createHud(hudEl, {
+  onSelectAnchor: (index) => {
+    const clock = performance.now() / 1000 - startTime;
+    morph.morphTo(NAMED_SEED_LIST[index]!, clock);
+  },
+  onRandomize: () => {
+    const clock = performance.now() / 1000 - startTime;
+    morph.morphTo(randomSeed(), clock);
+  },
+});
+
 onFunctionKey((code) => {
   const clock = performance.now() / 1000 - startTime;
   const fMatch = /^F([1-5])$/.exec(code);
-  if (!fMatch) return; // F6+ belong to the HUD (randomize/copy), wired in Phase 6
-  const index = Number(fMatch[1]) - 1;
-  morph.morphTo(NAMED_SEED_LIST[index]!, clock);
+  if (fMatch) {
+    const index = Number(fMatch[1]) - 1;
+    morph.morphTo(NAMED_SEED_LIST[index]!, clock);
+    return;
+  }
+  if (code === 'F6') {
+    morph.morphTo(randomSeed(), clock);
+    return;
+  }
+  if (code === 'F7') {
+    navigator.clipboard.writeText(location.href).catch(() => {
+      /* flash still gives visual feedback even if the clipboard write fails */
+    });
+    hud.flashChip();
+  }
 });
 
 window.addEventListener('resize', () => {
@@ -122,8 +150,13 @@ function loop(): void {
   // 3. quality governor
   quality.update(dtMs);
 
-  // 5. key animations
+  // 4. camera drift
+  updateCameraDrift(stage, currentStyle, clock, idle.driftScale);
+  updateBloom(stage, currentStyle, velocity.v);
+
+  // 5. key animations (idle breathing/ghost-ripple runs after so it wins at rest)
   updateKeyAnims(keyboard, currentStyle, clock);
+  idle.update(clock, currentStyle, keyboard, particles);
 
   // 6. particle uniforms
   particles.update(clock, currentStyle, velocity.v, stage);
@@ -131,6 +164,8 @@ function loop(): void {
   // 7. background uniforms
   const pressWaveAge = clock - lastBackspaceTime;
   background.update(clock, velocity.v, pressWaveAge);
+
+  hud.update(currentStyle, morph.seed);
 
   // 8. render
   stage.render();

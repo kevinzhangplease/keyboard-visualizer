@@ -77,6 +77,12 @@ export function toThreeColor(oklch: Oklch): THREE.Color {
   return new THREE.Color().setRGB(r, g, b, THREE.LinearSRGBColorSpace);
 }
 
+// CSS oklch() string for DOM/HUD styling (spec §8.2, §8.3): `oklch(L C H)` or `oklch(L C H / A)`.
+export function toCssOklch(oklch: Oklch, alpha?: number): string {
+  const a = alpha === undefined ? '' : ` / ${alpha}`;
+  return `oklch(${oklch.l} ${oklch.c} ${oklch.h}${a})`;
+}
+
 // Lerp two OKLCH colors along the shortest hue arc.
 export function lerpOklch(a: Oklch, b: Oklch, t: number): Oklch {
   const l = lerp(a.l, b.l, t);

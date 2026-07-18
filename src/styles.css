@@ -92,9 +92,7 @@ body {
   align-items: center;
   gap: 10px;
   opacity: 0.55;
-  transition:
-    opacity 0.5s ease,
-    opacity 0.12s ease;
+  transition: opacity 0.12s ease;
   pointer-events: auto;
   user-select: none;
 }
@@ -103,8 +101,10 @@ body {
   opacity: 1;
 }
 
-#hud.faded {
+/* 4s mouse-idle fade: slower out (0.5s), instant-feeling back in via the base 0.12s rule. */
+#hud.idle-faded {
   opacity: 0;
+  transition-duration: 0.5s;
   pointer-events: none;
 }
 
