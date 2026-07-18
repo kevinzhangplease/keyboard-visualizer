@@ -2,15 +2,21 @@
 
 import { createStage } from './render/stage';
 import { createBackground } from './render/background';
-import { createKeyboard, getKeyTopWorld, setupEnvironment, updateLights } from './render/keyboard';
+import {
+  createKeyboard,
+  getKeyTopWorld,
+  setupEnvironment,
+  updateLights,
+  type Keyboard,
+} from './render/keyboard';
 import { triggerBackspace, triggerPress, updateKeyAnims, type KeyAnimHooks } from './render/keyAnim';
 import { createParticleSystem } from './render/particles';
 import { createQualityGovernor } from './state/quality';
 import { createVelocityTracker } from './input/velocity';
-import { initKeyInput, onKeyEvent } from './input/keys';
+import { createMorphController } from './state/transitions';
+import { initKeyInput, onFunctionKey, onKeyEvent } from './input/keys';
 import { initAudioEngine, noteOn, noteOnBackspace, setAudioStyle } from './audio/engine';
-import { styleFromSeed } from './style/blend';
-import { getSeedFromURL } from './core/seed';
+import { getSeedFromURL, NAMED_SEED_LIST } from './core/seed';
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 const stage = createStage(canvas);
@@ -18,10 +24,11 @@ const background = createBackground();
 stage.scene.add(background.mesh);
 
 const seed = getSeedFromURL();
-const currentStyle = styleFromSeed(seed);
+const morph = createMorphController(seed);
+let currentStyle = morph.style;
 background.setStyle(currentStyle);
 
-const keyboard = createKeyboard(stage, currentStyle);
+const keyboard: Keyboard = createKeyboard(stage, currentStyle);
 updateLights(stage, currentStyle);
 setupEnvironment(stage);
 
@@ -60,12 +67,21 @@ onKeyEvent(({ key, isDown }) => {
   }
 });
 
+onFunctionKey((code) => {
+  const clock = performance.now() / 1000 - startTime;
+  const fMatch = /^F([1-5])$/.exec(code);
+  if (!fMatch) return; // F6+ belong to the HUD (randomize/copy), wired in Phase 6
+  const index = Number(fMatch[1]) - 1;
+  morph.morphTo(NAMED_SEED_LIST[index]!, clock);
+});
+
 window.addEventListener('resize', () => {
   background.resize(window.innerWidth, window.innerHeight);
 });
 
 let booted = false;
 let lastFrameMs = performance.now();
+let lastAppliedStyle: typeof currentStyle | null = null;
 
 function fadeSplash(): void {
   const splash = document.getElementById('splash');
@@ -82,6 +98,23 @@ function loop(): void {
   const dtMs = nowMs - lastFrameMs;
   lastFrameMs = nowMs;
   const clock = nowMs / 1000 - startTime;
+
+  // 1. morph interpolation -> currentStyle
+  const morphCompleted = morph.update(clock);
+  currentStyle = morph.style;
+  // lerpStyle() only allocates a new object while a morph is actively running, so a
+  // reference check is a free "did anything change" test — skips redundant OKLCH work at idle.
+  if (currentStyle !== lastAppliedStyle) {
+    lastAppliedStyle = currentStyle;
+    keyboard.applyMaterials(currentStyle);
+    updateLights(stage, currentStyle);
+    background.setStyle(currentStyle);
+    setAudioStyle(currentStyle);
+  }
+  if (morphCompleted) {
+    keyboard.rebuildGeometry(currentStyle);
+    particles.setSeed(morph.seed);
+  }
 
   // 2. velocity smoothing
   velocity.update(clock);

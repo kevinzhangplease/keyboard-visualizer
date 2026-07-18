@@ -79,3 +79,26 @@ export function composeStyle(p: StyleParams): Style {
 export function styleFromSeed(seed: number): Style {
   return composeStyle(paramsFromSeed(seed));
 }
+
+// Live-morph interpolation between two already-composed styles (spec §8.1). Distinct from
+// composeStyle: this animates CurrentStyle toward a target over the 1.4s transition, it does
+// not construct a Style from seed params. `pitchRoot`/`scale` are audio-only discretes that
+// switch at m=0.5 rather than gliding — everything else lerps continuously.
+export function lerpStyle(source: Style, target: Style, m: number): Style {
+  const out = {} as Style;
+
+  for (const d of DIALS) {
+    if (d.name === 'pitchRoot') {
+      out.pitchRoot = m < 0.5 ? source.pitchRoot : target.pitchRoot;
+      continue;
+    }
+    const a = source[d.name];
+    const b = target[d.name];
+    out[d.name] = d.logLerp ? Math.pow(2, lerp(Math.log2(a), Math.log2(b), m)) : lerp(a, b, m);
+  }
+
+  out.palette = source.palette.map((stopA, k) => lerpOklch(stopA, target.palette[k]!, m)) as Palette;
+  out.scale = m < 0.5 ? source.scale : target.scale;
+
+  return out;
+}
